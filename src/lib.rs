@@ -21,6 +21,8 @@ impl<T> BloomFilter<T> {
 
     /// Will insert the given item into the set. Returns true if the item was definitely not already
     /// in the set. Returns false if the item was *MAYBE* already in the set.
+    ///
+    /// Note: False positives are possible but not false negatives.
     pub fn insert(&mut self, t: &T) -> bool
     where
         T: Hash,
@@ -29,7 +31,16 @@ impl<T> BloomFilter<T> {
     }
 
     /// Returns true if the set *MIGHT* contain the item. Returns false if the set definitely does not
-    /// contain the item.
+    /// contain the item. I.e: Can have false positives, but can not have false negatives.
+    ///
+    /// ```
+    /// let mut filter = bloom_filter::BloomFilter::new();
+    ///
+    /// filter.insert(&1);
+    ///
+    /// assert!(filter.possibly_contains(&1)); // Always true because you can't have false negatives.
+    /// // assert!(!filter.possibly_contains(&2)); // Not always false because you can have false positives.
+    /// ```
     pub fn possibly_contains(&self, t: &T) -> bool
     where
         T: Hash,
@@ -44,5 +55,28 @@ impl<T> BloomFilter<T> {
         let mut hasher = self.hasher_state.build_hasher();
         t.hash(&mut hasher);
         hasher.finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    proptest! {
+        #[test]
+        fn if_added_then_possibly_contains_must_be_true(input: Vec<usize>) {
+            let mut filter: BloomFilter<usize> = BloomFilter::new();
+
+            input.iter().for_each(|x| {
+                filter.insert(&x);
+                ()
+            });
+
+            for x in input {
+                prop_assert!(filter.possibly_contains(&x));
+            }
+        }
     }
 }
